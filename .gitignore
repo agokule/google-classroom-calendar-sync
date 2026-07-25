@@ -1,0 +1,16 @@
+node_modules/
+
+# Your live Google session cookies — equivalent to your password.
+# Never commit this, to this repo or any fork.
+school-session.json
+
+# Personal output / instance state — fine to regenerate, shouldn't be
+# in the template repo.
+classroom.ics
+.gist-id
+debug/
+.env
+
+# Your real calendar IDs — not sensitive on their own, but no reason
+# to publish them either. calendars.example.json is the template.
+calendars.json

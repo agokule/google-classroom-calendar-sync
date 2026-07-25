@@ -1,0 +1,11 @@
+{
+  "name": "classroom-session-sync",
+  "private": true,
+  "scripts": {
+    "login": "node save-session.js",
+    "sync": "node fetch-ics.js"
+  },
+  "dependencies": {
+    "playwright": "^1.61.1"
+  }
+}

@@ -1,0 +1,84 @@
+// github-gist.js
+//
+// Optional: publishes the generated .ics to a secret GitHub Gist, so
+// something like Noctalia (once it can subscribe to a plain URL) can
+// pull your calendar without ever touching your Google session.
+//
+// Setup (one-time):
+//   1. github.com -> Settings -> Developer settings -> Personal access
+//      tokens -> Fine-grained tokens -> Generate new token.
+//   2. Resource owner: yourself. Repository access: doesn't matter,
+//      this only touches gists.
+//   3. Under "Account permissions", set "Gists" to Read and write.
+//   4. Copy the token, then in your shell:
+//        export GIST_TOKEN=github_pat_xxxxxxxx
+//      Never hardcode it here, especially since this script is meant
+//      to be shared/published.
+//   (If your account still only offers classic tokens for gists,
+//   Tokens (classic) with just the "gist" scope checked also works —
+//   pass it the same way via GIST_TOKEN.)
+//
+// "Secret" gist is GitHub's actual term — there's no true "private,
+// only-me" gist. Secret means unlisted: not on your public profile,
+// not indexed by GitHub or web search. It is NOT access-controlled —
+// anyone who has the URL can read it, indefinitely. Treat the URL
+// itself as the secret, the same way the old Google Calendar "secret
+// address in iCal format" worked.
+
+const fs = require('fs');
+
+const GIST_ID_FILE = './.gist-id';
+const GIST_FILENAME = 'classroom.ics';
+const API = 'https://api.github.com/gists';
+const API_VERSION = '2026-03-10';
+
+async function publishToGist(icsContent) {
+  const token = process.env.GIST_TOKEN;
+  if (!token) return null; // opt-in feature; do nothing if not configured
+
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': API_VERSION,
+    'User-Agent': 'classroom-session-sync',
+  };
+
+  let gistId = fs.existsSync(GIST_ID_FILE) ? fs.readFileSync(GIST_ID_FILE, 'utf8').trim() : null;
+
+  if (gistId) {
+    const res = await fetch(`${API}/${gistId}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ files: { [GIST_FILENAME]: { content: icsContent } } }),
+    });
+    if (res.ok) return rawUrl(await res.json());
+    if (res.status !== 404) {
+      throw new Error(`gist update failed: ${res.status} ${await res.text()}`);
+    }
+    gistId = null; // stale id (gist deleted?) - fall through and recreate
+  }
+
+  const res = await fetch(API, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      description: 'Classroom calendar feed (auto-generated, not indexed)',
+      public: false, // secret, not truly private - see comment above
+      files: { [GIST_FILENAME]: { content: icsContent } },
+    }),
+  });
+  if (!res.ok) throw new Error(`gist creation failed: ${res.status} ${await res.text()}`);
+  const data = await res.json();
+  fs.writeFileSync(GIST_ID_FILE, data.id);
+  return rawUrl(data);
+}
+
+function rawUrl(gistData) {
+  // Deliberately built without a commit hash. GitHub's own API response
+  // embeds a hash-pinned raw_url per file (one specific revision) — this
+  // form omits it, which always resolves to the latest revision instead,
+  // so the URL you give your calendar app never has to change.
+  return `https://gist.githubusercontent.com/${gistData.owner.login}/${gistData.id}/raw/${GIST_FILENAME}`;
+}
+
+module.exports = { publishToGist };
