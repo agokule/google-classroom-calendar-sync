@@ -1,11 +1,35 @@
 {
   "name": "classroom-session-sync",
-  "private": true,
+  "version": "1.0.0",
+  "description": "Sync Google Classroom due dates to a local .ics file when your school's Workspace policy blocks the official Calendar API",
+  "bin": {
+    "classroom-sync": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "login": "node save-session.js",
-    "sync": "node fetch-ics.js"
+    "build": "tsc",
+    "prepare": "npm run build",
+    "login": "tsx src/cli.ts login",
+    "sync": "tsx src/cli.ts run"
+  },
+  "keywords": [
+    "google-classroom",
+    "ics",
+    "calendar",
+    "sync"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
   },
   "dependencies": {
-    "playwright": "^1.61.1"
+    "playwright": "^1.62.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "tsx": "^4.23.1",
+    "typescript": "5.7"
   }
 }

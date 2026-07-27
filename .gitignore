@@ -14,3 +14,5 @@ debug/
 # Your real calendar IDs — not sensitive on their own, but no reason
 # to publish them either. calendars.example.json is the template.
 calendars.json
+
+dist/
