@@ -7,7 +7,6 @@
 
 import { chromium, Page } from 'playwright';
 import * as fs from 'fs';
-import { publishToGist } from './github-gist';
 import {
   CALENDARS_FILE,
   DEBUG_DIR,
@@ -246,10 +245,4 @@ export async function runSync(): Promise<void> {
   fs.writeFileSync(OUTPUT_FILE, ics);
   console.log('');
   console.log('Wrote', all.length, 'events to', OUTPUT_FILE);
-
-  const url = await publishToGist(ics).catch((err: unknown) => {
-    console.error('Gist publish failed:', err instanceof Error ? err.message : err);
-    return null;
-  });
-  if (url) console.log('Published to:', url);
 }

@@ -23,7 +23,7 @@
 // address in iCal format" worked.
 
 import * as fs from 'fs';
-import { ensureConfigDir, GIST_ID_FILE } from './config';
+import { ensureConfigDir, GIST_ID_FILE, OUTPUT_FILE } from './config';
 
 const GIST_FILENAME = 'classroom.ics';
 const API = 'https://api.github.com/gists';
@@ -93,4 +93,20 @@ export async function publishToGist(icsContent: string): Promise<string | null> 
   const data = (await res.json()) as GistResponse;
   fs.writeFileSync(GIST_ID_FILE, data.id);
   return rawUrl(data);
+}
+
+export async function runSyncGist(): Promise<void> {
+  if (!process.env.GIST_TOKEN) {
+    console.error('GIST_TOKEN is not set. See the setup instructions at the top of src/github-gist.ts.');
+    process.exit(1);
+  }
+
+  if (!fs.existsSync(OUTPUT_FILE)) {
+    console.error(`No ${OUTPUT_FILE} found. Run \`classroom-sync run\` first.`);
+    process.exit(1);
+  }
+
+  const ics = fs.readFileSync(OUTPUT_FILE, 'utf8');
+  const url = await publishToGist(ics);
+  console.log('Published to:', url);
 }

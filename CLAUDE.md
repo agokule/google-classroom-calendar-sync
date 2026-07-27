@@ -32,7 +32,7 @@ lifecycle script on `npm install -g`); when developing in a clone, use the
 
 ## Architecture
 
-- `src/cli.ts` — argv dispatch only (`login` | `run`), delegates immediately.
+- `src/cli.ts` — argv dispatch only (`login` | `run` | `sync-gist`), delegates immediately.
 - `src/session.ts` — `login`: opens a non-headless browser at
   calendar.google.com, waits for the user to sign in manually, then saves
   Playwright's `storageState` (cookies/localStorage) to disk. This saved
@@ -52,12 +52,15 @@ lifecycle script on `npm install -g`); when developing in a clone, use the
   id). After scraping, writes a hand-built `.ics` (`eventsToICS`) and dumps
   each calendar's final page HTML to `~/.classroom-sync/debug/<name>.html`
   for troubleshooting when selectors stop matching.
-- `src/github-gist.ts` — optional: if `GIST_TOKEN` env var is set, pushes
-  the generated `.ics` to a secret (unlisted, not access-controlled) GitHub
-  Gist and prints a commit-hash-free raw URL that always resolves to the
-  latest revision. No-ops silently if the env var is absent. Gist id is
-  cached in `~/.classroom-sync/.gist-id` so subsequent runs PATCH the same
-  gist instead of creating new ones.
+- `src/github-gist.ts` — optional, driven by the separate `sync-gist`
+  command (not run automatically by `run`): if `GIST_TOKEN` env var is
+  set, pushes the on-disk `.ics` (`OUTPUT_FILE`, i.e. whatever `run` last
+  wrote) to a secret (unlisted, not access-controlled) GitHub Gist and
+  prints a commit-hash-free raw URL that always resolves to the latest
+  revision. `runSyncGist()` exits with an error if `GIST_TOKEN` is unset
+  or `OUTPUT_FILE` doesn't exist yet. Gist id is cached in
+  `~/.classroom-sync/.gist-id` so subsequent runs PATCH the same gist
+  instead of creating new ones.
 - `src/config.ts` — defines all persistent-state paths, all rooted at
   `~/.classroom-sync/` (`session.json`, `calendars.json`, `classroom.ics`,
   `.gist-id`, `debug/`). Nothing the tool reads or writes lives inside the

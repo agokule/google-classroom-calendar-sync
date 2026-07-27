@@ -12,7 +12,8 @@
     "build": "tsc",
     "prepare": "npm run build",
     "login": "tsx src/cli.ts login",
-    "sync": "tsx src/cli.ts run"
+    "sync": "tsx src/cli.ts run",
+    "sync-gist": "tsx src/cli.ts sync-gist"
   },
   "keywords": [
     "google-classroom",

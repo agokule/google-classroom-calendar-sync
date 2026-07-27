@@ -37,8 +37,9 @@ same `~/.classroom-sync/` config either way.
 ## Usage
 
 ```bash
-classroom-sync login   # opens a real browser window — log in once
-classroom-sync run     # scrapes your calendars, writes classroom.ics
+classroom-sync login       # opens a real browser window — log in once
+classroom-sync run         # scrapes your calendars, writes classroom.ics
+classroom-sync sync-gist   # publishes the current classroom.ics to a GitHub Gist
 ```
 
 Everything this tool reads or writes lives in `~/.classroom-sync/`
@@ -58,11 +59,12 @@ permission-denied page, just run `login` again.
 ## Optional: publish to a GitHub Gist
 
 Set a `GIST_TOKEN` environment variable (a fine-grained personal access
-token with the "Gists" account permission set to read/write) and `run`
-will also push the `.ics` to a secret Gist, printing a stable URL you can
-subscribe to from anywhere — useful for a calendar app that can't read a
-local file directly. "Secret" means unlisted, not access-controlled:
-treat the URL itself as the secret.
+token with the "Gists" account permission set to read/write), then run
+`classroom-sync sync-gist` after `run` to push the current `classroom.ics`
+to a secret Gist, printing a stable URL you can subscribe to from
+anywhere — useful for a calendar app that can't read a local file
+directly. "Secret" means unlisted, not access-controlled: treat the URL
+itself as the secret.
 
 ## License
 
