@@ -12,6 +12,7 @@ import {
   DEBUG_DIR,
   OUTPUT_FILE,
   SESSION_FILE,
+  browserChannel,
   ensureCalendarsFile,
   ensureConfigDir,
 } from './config';
@@ -221,7 +222,7 @@ export async function runSync(): Promise<void> {
   }
   const CALENDARS = JSON.parse(fs.readFileSync(CALENDARS_FILE, 'utf8')) as CalendarConfig[];
 
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ channel: browserChannel() });
   const context = await browser.newContext({ storageState: SESSION_FILE });
   const page = await context.newPage();
 

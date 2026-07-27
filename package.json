@@ -10,7 +10,7 @@
   ],
   "scripts": {
     "build": "tsc",
-    "prepare": "npm run build",
+    "prepare": "npm run build && npx playwright install chromium",
     "login": "tsx src/cli.ts login",
     "sync": "tsx src/cli.ts run",
     "sync-gist": "tsx src/cli.ts sync-gist"

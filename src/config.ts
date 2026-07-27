@@ -26,6 +26,22 @@ export function ensureConfigDir(): void {
 }
 
 /**
+ * Playwright's bundled Chromium + `playwright install-deps` only cover
+ * officially supported distros (Debian/Ubuntu/Fedora family). On anything
+ * else (Arch, NixOS, ...) `install-deps` has nothing to install and the
+ * bundled binary just fails to launch with missing .so errors. The
+ * workaround is to launch the distro's own Chromium/Chrome package
+ * instead of Playwright's bundled build - Playwright supports this via
+ * the `channel` launch option, and a distro-packaged browser pulls in its
+ * own correct shared libraries through the normal package manager.
+ * Setting this env var opts into that path, e.g.
+ * CLASSROOM_SYNC_BROWSER_CHANNEL=chromium after `pacman -S chromium`.
+ */
+export function browserChannel(): string | undefined {
+  return process.env.CLASSROOM_SYNC_BROWSER_CHANNEL;
+}
+
+/**
  * Returns true if calendars.json already existed. If it didn't,
  * writes the template and returns false — callers should treat false
  * as "stop and tell the user to edit it first."

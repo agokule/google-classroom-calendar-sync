@@ -56,6 +56,23 @@ Your saved session will eventually expire (how long depends on your
 school's session-length policy) — when `run` starts warning about a
 permission-denied page, just run `login` again.
 
+### Unsupported Linux distros (Arch, NixOS, ...)
+
+`playwright install-deps` only knows how to install shared libraries on
+Playwright's officially supported distros (Debian/Ubuntu/Fedora family).
+On anything else it has nothing to do, and Playwright's bundled Chromium
+will fail to launch with missing-library errors. If you hit that, install
+your distro's own Chromium and point this tool at it instead of the
+bundled build:
+
+```bash
+sudo pacman -S chromium   # or your distro's equivalent package
+export CLASSROOM_SYNC_BROWSER_CHANNEL=chromium
+classroom-sync login
+```
+
+Set the same env var before `classroom-sync run` too.
+
 ## Optional: publish to a GitHub Gist
 
 Set a `GIST_TOKEN` environment variable (a fine-grained personal access

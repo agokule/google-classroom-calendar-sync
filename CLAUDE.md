@@ -66,7 +66,11 @@ lifecycle script on `npm install -g`); when developing in a clone, use the
   `.gist-id`, `debug/`). Nothing the tool reads or writes lives inside the
   repo itself. `ensureCalendarsFile()` writes a template and returns
   `false` on first run so callers know to stop and ask the user to fill in
-  real calendar IDs before scraping.
+  real calendar IDs before scraping. `browserChannel()` reads
+  `CLASSROOM_SYNC_BROWSER_CHANNEL`, used by both `session.ts` and
+  `sync.ts` to launch a distro-packaged Chromium (via Playwright's
+  `channel` option) instead of Playwright's bundled build — needed on
+  Linux distros `playwright install-deps` doesn't support (Arch, NixOS).
 - `src/types.ts` — shared `CalendarConfig` / `ParsedDate` / `ScrapedEvent`
   shapes used across the above.
 
