@@ -23,7 +23,7 @@
 // address in iCal format" worked.
 
 import * as fs from 'fs';
-import { ensureConfigDir, GIST_ID_FILE, OUTPUT_FILE } from './config';
+import { ensureConfigDir, GIST_ID_FILE, OUTPUT_FILE } from './config.js';
 
 const GIST_FILENAME = 'classroom.ics';
 const API = 'https://api.github.com/gists';

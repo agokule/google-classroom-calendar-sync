@@ -26,6 +26,12 @@ There is no test suite and no lint script configured. `npm run build`
 (`tsc`) is the only correctness check available — run it after changes to
 `src/`.
 
+The package is ESM (`"type": "module"`, `module: nodenext`), so relative
+imports in `src/` must use the `.js` extension. TypeScript is v7 (the
+native compiler), which has no `tsserver.js` — editor tooling that needs
+one (e.g. `typescript-language-server`) won't use this project's copy.
+Requires Node 22+.
+
 The published CLI entry point is `dist/cli.js` (built via the `prepare`
 lifecycle script on `npm install -g`); when developing in a clone, use the
 `tsx`-based `login`/`sync` scripts instead of building.

@@ -5,7 +5,7 @@
 // already has when you're signed in.
 
 import { chromium } from 'playwright';
-import { browserChannel, ensureConfigDir, SESSION_FILE } from './config';
+import { browserChannel, ensureConfigDir, SESSION_FILE } from './config.js';
 
 export async function runLogin(): Promise<void> {
   ensureConfigDir();

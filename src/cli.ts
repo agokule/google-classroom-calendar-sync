@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import { runLogin } from './session';
-import { runSync } from './sync';
-import { runSyncGist } from './github-gist';
+import { runLogin } from './session.js';
+import { runSync } from './sync.js';
+import { runSyncGist } from './github-gist.js';
 
 const USAGE = `classroom-sync — sync Google Classroom due dates to a local .ics file
 

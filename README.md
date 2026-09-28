@@ -20,6 +20,8 @@ SLA on any of this working forever, just on it working today.
 
 ## Install
 
+Requires Node.js 22 or newer.
+
 ```bash
 npm install -g github:agokule/google-classroom-calendar-sync
 ```

@@ -15,8 +15,8 @@ import {
   browserChannel,
   ensureCalendarsFile,
   ensureConfigDir,
-} from './config';
-import type { CalendarConfig, ParsedDate, ScrapedEvent } from './types';
+} from './config.js';
+import type { CalendarConfig, ParsedDate, ScrapedEvent } from './types.js';
 
 const TIMEZONE = 'America/Toronto';
 
