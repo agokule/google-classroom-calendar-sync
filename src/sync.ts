@@ -5,26 +5,35 @@
 // data-eventid, .WBi6vc for title, .XuJrye for the full tooltip
 // text) — not guessed.
 
-import { chromium, Page } from 'playwright';
-import * as fs from 'fs';
+import type { Page } from 'playwright';
+import * as fs from 'node:fs';
+import { launchBrowser } from './browser.js';
 import {
   CALENDARS_FILE,
   DEBUG_DIR,
   OUTPUT_FILE,
   SESSION_FILE,
-  browserChannel,
-  ensureCalendarsFile,
   ensureConfigDir,
+  loadCalendars,
+  monthsToWalk,
+  timezone,
 } from './config.js';
+import { UserError } from './errors.js';
 import type { CalendarConfig, ParsedDate, ScrapedEvent } from './types.js';
 
-const TIMEZONE = 'America/Toronto';
+// How `sync` reports what it's doing, so the plain CLI and the TUI can
+// each present it their own way.
+export interface SyncReporter {
+  progress(message: string): void; // transient status while a calendar is scraped
+  info(message: string): void;
+  warn(message: string): void;
+}
 
-// Months to page through from whichever month loads by default
-// (today's). Negative = click back, positive = click forward. Every
-// month visited along the way gets scraped and merged in, so -1
-// scrapes today's month AND the one before it.
-const MONTHS_TO_WALK = -1;
+const consoleReporter: SyncReporter = {
+  progress: () => {},
+  info: (message) => console.log(message),
+  warn: (message) => console.warn(message),
+};
 
 // Both confirmed by inspecting the real page (right-click > Inspect
 // on each arrow) — span[2] is back, span[3] is forward.
@@ -53,8 +62,8 @@ const DATE_RE = new RegExp(
   'i'
 );
 
-function baseUrl(calendarId: string): string {
-  const params = new URLSearchParams({ src: calendarId, ctz: TIMEZONE });
+function baseUrl(calendarId: string, tz: string): string {
+  const params = new URLSearchParams({ src: calendarId, ctz: tz });
   return `https://calendar.google.com/calendar/embed?${params.toString()}`;
 }
 
@@ -110,7 +119,8 @@ function parseEventTooltip(tooltipText: string): ParsedDate | null {
 async function scrapeVisibleMonth(
   page: Page,
   cal: CalendarConfig,
-  seenUids: Set<string>
+  seenUids: Set<string>,
+  report: SyncReporter
 ): Promise<ScrapedEvent[]> {
   const chips = page.locator('[data-eventchip]');
   await page.waitForTimeout(400);
@@ -139,7 +149,7 @@ async function scrapeVisibleMonth(
   }
 
   if (missed.length) {
-    console.warn(`${cal.name}: ${missed.length} chip(s) found but couldn't be read (title/tooltip lookup failed) \u2014 check debug/*.html if events still look missing`);
+    report.warn(`${cal.name}: ${missed.length} chip(s) found but couldn't be read (title/tooltip lookup failed) \u2014 check debug/*.html if events still look missing`);
   }
 
   return events;
@@ -184,19 +194,34 @@ function eventsToICS(allEvents: ScrapedEvent[]): string {
   return lines.join('\r\n');
 }
 
-async function walkAndScrape(page: Page, cal: CalendarConfig): Promise<ScrapedEvent[]> {
+async function walkAndScrape(
+  page: Page,
+  cal: CalendarConfig,
+  tz: string,
+  walk: number,
+  report: SyncReporter
+): Promise<ScrapedEvent[]> {
   const seenUids = new Set<string>();
   const all: ScrapedEvent[] = [];
-  const steps = Math.abs(MONTHS_TO_WALK);
-  const step = MONTHS_TO_WALK < 0 ? clickBack : clickForward;
+  const steps = Math.abs(walk);
+  const step = walk < 0 ? clickBack : clickForward;
 
-  await page.goto(baseUrl(cal.id), { waitUntil: 'networkidle', timeout: 30000 });
+  await page.goto(baseUrl(cal.id, tz), { waitUntil: 'networkidle', timeout: 30000 });
+  // An expired or signed-out session lands on Google's sign-in page
+  // instead of the calendar; say so rather than timing out below on nav
+  // buttons that aren't there.
+  if (new URL(page.url()).hostname === 'accounts.google.com') {
+    throw new UserError(
+      'Your saved Google session has expired. Log in again with `classroom-sync login`\n' +
+      '(or "Log in to Google" in `classroom-sync config`), then sync again.'
+    );
+  }
   await page.waitForTimeout(800);
-  all.push(...(await scrapeVisibleMonth(page, cal, seenUids)));
+  all.push(...(await scrapeVisibleMonth(page, cal, seenUids, report)));
 
   for (let i = 0; i < steps; i++) {
     await step(page);
-    all.push(...(await scrapeVisibleMonth(page, cal, seenUids)));
+    all.push(...(await scrapeVisibleMonth(page, cal, seenUids, report)));
   }
 
   fs.mkdirSync(DEBUG_DIR, { recursive: true });
@@ -206,44 +231,54 @@ async function walkAndScrape(page: Page, cal: CalendarConfig): Promise<ScrapedEv
   return all;
 }
 
-export async function runSync(): Promise<void> {
+/** Scrapes every configured calendar and writes OUTPUT_FILE. Returns the event count. */
+export async function sync(report: SyncReporter): Promise<number> {
   ensureConfigDir();
 
   if (!fs.existsSync(SESSION_FILE)) {
-    console.error(`No saved session found at ${SESSION_FILE}.`);
-    console.error('Run `classroom-sync login` first.');
-    process.exit(1);
+    throw new UserError(`No saved session found at ${SESSION_FILE}.\nRun \`classroom-sync login\` first.`);
   }
 
-  if (!ensureCalendarsFile()) {
-    console.error(`Wrote a template to ${CALENDARS_FILE}.`);
-    console.error('Edit it with your real calendar IDs and run this again.');
-    process.exit(1);
+  const calendars = loadCalendars();
+  if (calendars.length === 0) {
+    throw new UserError(
+      'No classrooms configured yet. Add some with `classroom-sync config`\n' +
+      `(or edit ${CALENDARS_FILE} by hand).`
+    );
   }
-  const CALENDARS = JSON.parse(fs.readFileSync(CALENDARS_FILE, 'utf8')) as CalendarConfig[];
+  const tz = timezone();
+  const walk = monthsToWalk();
 
-  const browser = await chromium.launch({ channel: browserChannel() });
-  const context = await browser.newContext({ storageState: SESSION_FILE });
-  const page = await context.newPage();
-
+  report.progress('Launching browser');
+  const browser = await launchBrowser(true);
   const all: ScrapedEvent[] = [];
-  for (const cal of CALENDARS) {
-    const events = await walkAndScrape(page, cal);
-    console.log(`${cal.name}: ${events.length} event(s) across ${Math.abs(MONTHS_TO_WALK) + 1} month(s)`);
-    all.push(...events);
-  }
+  try {
+    const context = await browser.newContext({ storageState: SESSION_FILE });
+    const page = await context.newPage();
 
-  await browser.close();
+    for (const [i, cal] of calendars.entries()) {
+      report.progress(`Scraping ${cal.name} (${i + 1}/${calendars.length})`);
+      const events = await walkAndScrape(page, cal, tz, walk, report);
+      report.info(`${cal.name}: ${events.length} event(s) across ${Math.abs(walk) + 1} month(s)`);
+      all.push(...events);
+    }
+  } finally {
+    await browser.close();
+  }
 
   if (all.length === 0) {
-    console.error('');
-    console.error(`No events scraped. Check ${DEBUG_DIR} \u2014 likely either the session`);
-    console.error('expired (run `classroom-sync login` again) or a selector needs adjusting.');
-    process.exit(1);
+    throw new UserError(
+      `No events scraped. Check ${DEBUG_DIR} \u2014 likely either the session\n` +
+      'expired (run `classroom-sync login` again) or a selector needs adjusting.'
+    );
   }
 
-  const ics = eventsToICS(all);
-  fs.writeFileSync(OUTPUT_FILE, ics);
+  fs.writeFileSync(OUTPUT_FILE, eventsToICS(all));
+  return all.length;
+}
+
+export async function runSync(): Promise<void> {
+  const count = await sync(consoleReporter);
   console.log('');
-  console.log('Wrote', all.length, 'events to', OUTPUT_FILE);
+  console.log('Wrote', count, 'events to', OUTPUT_FILE);
 }

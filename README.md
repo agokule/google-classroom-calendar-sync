@@ -32,31 +32,40 @@ build on install — if that gets skipped in your environment, run
 `npx playwright install chromium` once manually.
 
 Prefer running from a clone instead of installing globally? Clone the
-repo, run `npm install`, then use `npm run login` / `npm run sync` in
-place of the `classroom-sync` commands below — both read and write the
-same `~/.classroom-sync/` config either way.
+repo, run `npm install`, then use `npm run config` / `npm run login` /
+`npm run sync` / `npm run sync-gist` in place of the `classroom-sync`
+commands below — both read and write the same `~/.classroom-sync/`
+config either way.
 
 ## Usage
 
 ```bash
+classroom-sync config      # interactive setup — classrooms, GitHub token, browser, ...
 classroom-sync login       # opens a real browser window — log in once
 classroom-sync run         # scrapes your calendars, writes classroom.ics
 classroom-sync sync-gist   # publishes the current classroom.ics to a GitHub Gist
 ```
 
-Everything this tool reads or writes lives in `~/.classroom-sync/`
-(session, calendar config, output, debug HTML) — never inside the repo
-itself, so there's nothing personal to accidentally commit.
+`classroom-sync config` is the easiest place to start: it's a menu for
+adding, renaming, and removing classrooms, saving a GitHub token,
+choosing the browser, timezone, and how many months to scrape, and it can
+run the login, sync, and publish steps for you. Changes are saved as soon
+as you make them.
 
-The first `run` writes a template to `~/.classroom-sync/calendars.json`
-and stops so you can fill it in.
+Everything this tool reads or writes lives in `~/.classroom-sync/`
+(session, `calendars.json`, `settings.json`, output, debug HTML) — never
+inside the repo itself, so there's nothing personal to accidentally
+commit. You can also edit `calendars.json` by hand; see
+`calendars.example.json` for its format.
 
 Find each class's calendar ID on its calendar's settings page ("Integrate
-calendar" → the field right above "Public URL to this calendar").
+calendar" → the field right above "Public URL to this calendar"). The
+`config` menu also accepts a pasted calendar link and pulls the ID out of
+it.
 
 Your saved session will eventually expire (how long depends on your
-school's session-length policy) — when `run` starts warning about a
-permission-denied page, just run `login` again.
+school's session-length policy) — when `run` says the session has
+expired, just run `login` again.
 
 ### Unsupported Linux distros (Arch, NixOS, ...)
 
@@ -69,19 +78,27 @@ bundled build:
 
 ```bash
 sudo pacman -S chromium   # or your distro's equivalent package
-export CLASSROOM_SYNC_BROWSER_CHANNEL=chromium
-classroom-sync login
+classroom-sync config     # Browser → pick /usr/bin/chromium
 ```
 
-Set the same env var before `classroom-sync run` too.
+The `config` menu lists any Chromium/Chrome it finds on your `PATH`,
+checks that the one you pick actually launches, and saves the choice for
+`login` and `run`. (The older `CLASSROOM_SYNC_BROWSER_CHANNEL` env var
+still works and overrides that setting, but note that
+`CLASSROOM_SYNC_BROWSER_CHANNEL=chromium` means Playwright's own
+downloaded Chromium, not your distro's.)
 
 ## Optional: publish to a GitHub Gist
 
-Set a `GIST_TOKEN` environment variable (a fine-grained personal access
-token with the "Gists" account permission set to read/write), then run
-`classroom-sync sync-gist` after `run` to push the current `classroom.ics`
-to a secret Gist, printing a stable URL you can subscribe to from
-anywhere — useful for a calendar app that can't read a local file
+Create a fine-grained personal access token with the "Gists" account
+permission set to read/write, and save it with `classroom-sync config`
+(it walks you through creating one and checks it with GitHub). It's
+stored in `~/.classroom-sync/settings.json`, readable only by you. A
+`GIST_TOKEN` environment variable also works and takes priority.
+
+Then run `classroom-sync sync-gist` after `run` to push the current
+`classroom.ics` to a secret Gist, printing a stable URL you can subscribe
+to from anywhere — useful for a calendar app that can't read a local file
 directly. "Secret" means unlisted, not access-controlled: treat the URL
 itself as the secret.
 

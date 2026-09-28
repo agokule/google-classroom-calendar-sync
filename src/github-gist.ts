@@ -8,12 +8,13 @@
 //   2. Resource owner: yourself. Repository access: doesn't matter,
 //      this only touches gists.
 //   3. Under "Account permissions", set "Gists" to Read and write.
-//   4. Copy the token, then in your shell:
+//   4. Copy the token and save it with `classroom-sync config` (stored in
+//      ~/.classroom-sync/settings.json, owner-readable only), or export
+//      it in your shell instead, which takes priority:
 //        export GIST_TOKEN=github_pat_xxxxxxxx
 //      Never hardcode it here, especially since this is published.
 //   (If your account still only offers classic tokens for gists,
-//   Tokens (classic) with just the "gist" scope checked also works —
-//   pass it the same way via GIST_TOKEN.)
+//   Tokens (classic) with just the "gist" scope checked also works.)
 //
 // "Secret" gist is GitHub's actual term — there's no true "private,
 // only-me" gist. Secret means unlisted: not on your public profile,
@@ -22,11 +23,13 @@
 // itself as the secret, the same way the old Google Calendar "secret
 // address in iCal format" worked.
 
-import * as fs from 'fs';
-import { ensureConfigDir, GIST_ID_FILE, OUTPUT_FILE } from './config.js';
+import * as fs from 'node:fs';
+import { ensureConfigDir, gistToken, GIST_ID_FILE, OUTPUT_FILE } from './config.js';
+import { UserError } from './errors.js';
 
 const GIST_FILENAME = 'classroom.ics';
 const API = 'https://api.github.com/gists';
+const USER_API = 'https://api.github.com/user';
 const API_VERSION = '2026-03-10';
 
 interface GistFile {
@@ -57,10 +60,19 @@ function rawUrl(gist: GistResponse): string {
   return `https://gist.githubusercontent.com/${gist.owner.login}/${gist.id}/raw/${GIST_FILENAME}`;
 }
 
-export async function publishToGist(icsContent: string): Promise<string | null> {
-  const token = process.env.GIST_TOKEN;
-  if (!token) return null; // opt-in feature; do nothing if not configured
+/**
+ * Returns the GitHub login the token belongs to, or null if GitHub
+ * rejects it. This only proves the token is live — not that it has the
+ * Gists permission; a publish is the only real test of that.
+ */
+export async function checkGistToken(token: string): Promise<string | null> {
+  const res = await fetch(USER_API, { headers: authHeaders(token) });
+  if (res.status === 401) return null;
+  if (!res.ok) throw new Error(`GitHub token check failed: ${res.status} ${await res.text()}`);
+  return ((await res.json()) as { login: string }).login;
+}
 
+export async function publishToGist(token: string, icsContent: string): Promise<string> {
   ensureConfigDir();
   const headers = authHeaders(token);
   let gistId: string | null = fs.existsSync(GIST_ID_FILE)
@@ -95,18 +107,23 @@ export async function publishToGist(icsContent: string): Promise<string | null> 
   return rawUrl(data);
 }
 
-export async function runSyncGist(): Promise<void> {
-  if (!process.env.GIST_TOKEN) {
-    console.error('GIST_TOKEN is not set. See the setup instructions at the top of src/github-gist.ts.');
-    process.exit(1);
+/** Publishes the on-disk OUTPUT_FILE and returns its stable raw URL. */
+export async function syncGist(): Promise<string> {
+  const token = gistToken();
+  if (!token) {
+    throw new UserError(
+      'No GitHub token configured. Save one with `classroom-sync config` (it explains\n' +
+      'how to create one), or set the GIST_TOKEN environment variable.'
+    );
   }
 
   if (!fs.existsSync(OUTPUT_FILE)) {
-    console.error(`No ${OUTPUT_FILE} found. Run \`classroom-sync run\` first.`);
-    process.exit(1);
+    throw new UserError(`No ${OUTPUT_FILE} found. Run \`classroom-sync run\` first.`);
   }
 
-  const ics = fs.readFileSync(OUTPUT_FILE, 'utf8');
-  const url = await publishToGist(ics);
-  console.log('Published to:', url);
+  return publishToGist(token.token, fs.readFileSync(OUTPUT_FILE, 'utf8'));
+}
+
+export async function runSyncGist(): Promise<void> {
+  console.log('Published to:', await syncGist());
 }
