@@ -207,28 +207,50 @@ async function walkAndScrape(
   const step = walk < 0 ? clickBack : clickForward;
 
   await page.goto(baseUrl(cal.id, tz), { waitUntil: 'networkidle', timeout: 30000 });
-  // An expired or signed-out session lands on Google's sign-in page
-  // instead of the calendar; say so rather than timing out below on nav
-  // buttons that aren't there.
-  if (new URL(page.url()).hostname === 'accounts.google.com') {
+  // An expired or signed-out session lands on a sign-in page instead of
+  // the calendar — Google's own, or the school's SSO provider (e.g.
+  // login.microsoftonline.com) — so check that we stayed on Calendar
+  // rather than for one particular sign-in host. Say so rather than
+  // timing out below on nav buttons that aren't there.
+  if (new URL(page.url()).hostname !== 'calendar.google.com') {
     throw new UserError(
       'Your saved Google session has expired. Log in again with `classroom-sync login`\n' +
       '(or "Log in to Google" in `classroom-sync config`), then sync again.'
     );
   }
-  await page.waitForTimeout(800);
-  all.push(...(await scrapeVisibleMonth(page, cal, seenUids, report)));
-
-  for (let i = 0; i < steps; i++) {
-    await step(page);
+  try {
+    await page.waitForTimeout(800);
     all.push(...(await scrapeVisibleMonth(page, cal, seenUids, report)));
+
+    for (let i = 0; i < steps; i++) {
+      await step(page);
+      all.push(...(await scrapeVisibleMonth(page, cal, seenUids, report)));
+    }
+  } catch (err) {
+    // Usually Google changed the page markup so a selector no longer
+    // matches — keep what the page looked like at the point of failure.
+    // Don't let a failed snapshot hide the original error.
+    const snapshot = await saveDebugSnapshot(page, cal).catch(() => null);
+    const reason = err instanceof Error ? err.message.split('\n')[0] : String(err);
+    throw new UserError(
+      `Scraping ${cal.name} failed: ${reason}` +
+      (snapshot ? `\nSaved the page as it was to ${snapshot}.html / .png.` : ''),
+      { cause: err }
+    );
   }
 
-  fs.mkdirSync(DEBUG_DIR, { recursive: true });
-  const safeName = cal.name.replace(/\W+/g, '_');
-  fs.writeFileSync(`${DEBUG_DIR}/${safeName}.html`, await page.content());
-
+  await saveDebugSnapshot(page, cal);
   return all;
+}
+
+// Writes the page's current HTML and a screenshot to DEBUG_DIR; returns
+// the shared path prefix (without extension).
+async function saveDebugSnapshot(page: Page, cal: CalendarConfig): Promise<string> {
+  fs.mkdirSync(DEBUG_DIR, { recursive: true });
+  const base = `${DEBUG_DIR}/${cal.name.replace(/\W+/g, '_')}`;
+  fs.writeFileSync(`${base}.html`, await page.content());
+  await page.screenshot({ path: `${base}.png`, fullPage: true });
+  return base;
 }
 
 /** Scrapes every configured calendar and writes OUTPUT_FILE. Returns the event count. */

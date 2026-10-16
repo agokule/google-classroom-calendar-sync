@@ -67,8 +67,10 @@ lifecycle script on `npm install -g`); when developing in a clone, use the
   turns Playwright's missing-OS-libraries error into install guidance.
 - `src/sync.ts` — `run`: the scraper. For each calendar in `calendars.json`,
   loads `https://calendar.google.com/calendar/embed?src=<id>&ctz=<timezone>`
-  using the saved session (a redirect to accounts.google.com means the
-  session expired — reported as a `UserError`), walks backward/forward
+  using the saved session (ending up on any host other than
+  calendar.google.com means the session expired — Google's sign-in page or
+  the school's SSO, e.g. login.microsoftonline.com — reported as a
+  `UserError`), walks backward/forward
   through `monthsToWalk` months (default `-1`, i.e. this month + last
   month; both it and the timezone come from settings), and on each visible month
   reads every `[data-eventchip]` node's title (`.WBi6vc`) and tooltip
@@ -78,10 +80,12 @@ lifecycle script on `npm install -g`); when developing in a clone, use the
   formats (single date, same-month range, cross-month range, cross-year
   range with year shown once vs. on both endpoints). Deduping across months
   uses each chip's `data-eventid` (falls back to a per-position synthetic
-  id). After scraping, writes a hand-built `.ics` (`eventsToICS`) and dumps
-  each calendar's final page HTML to `~/.classroom-sync/debug/<name>.html`
-  for troubleshooting when selectors stop matching (only after a
-  calendar's month walk succeeds). `sync(reporter)` does the work and
+  id). After scraping, writes a hand-built `.ics` (`eventsToICS`). Each
+  calendar's final page is saved as `~/.classroom-sync/debug/<name>.html`
+  plus a `.png` screenshot (`saveDebugSnapshot`) for troubleshooting when
+  selectors stop matching — on success, and also when the month walk
+  throws, in which case the error is rethrown as a `UserError` naming the
+  calendar and the snapshot path. `sync(reporter)` does the work and
   reports progress through a `SyncReporter`; `runSync()` is the CLI
   wrapper that prints to the console.
 - `src/github-gist.ts` — optional, driven by the separate `sync-gist`
