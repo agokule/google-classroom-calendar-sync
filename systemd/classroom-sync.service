@@ -1,0 +1,22 @@
+# Runs `classroom-sync run` once. Started on a schedule by
+# classroom-sync.timer; install both as user units (see the README's
+# "Sync automatically" section).
+#
+# systemd doesn't read your shell profile, so `classroom-sync` and the
+# `node` it runs on are only found in the system directories (/usr/bin,
+# /usr/local/bin). For nvm, ~/.local, ~/.npm-global, etc., set PATH in a
+# drop-in instead of editing this file — the README shows how. Publishing
+# to a Gist after each sync is also added with a drop-in.
+
+[Unit]
+Description=Sync Google Classroom due dates to ~/.classroom-sync/classroom.ics
+Documentation=https://github.com/agokule/google-classroom-calendar-sync#readme
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/env classroom-sync run
+# Oneshot services have no start timeout by default, and the timer won't
+# start a new run while one is still going, so a browser that hangs would
+# stop all future syncs. Playwright's own timeouts normally fire long
+# before this.
+TimeoutStartSec=15min

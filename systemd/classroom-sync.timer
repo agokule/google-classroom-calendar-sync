@@ -1,0 +1,15 @@
+# Starts classroom-sync.service once a day. Persistent=true makes up a
+# run missed while the computer was off or asleep as soon as it's back.
+
+[Unit]
+Description=Sync Google Classroom due dates daily
+Documentation=https://github.com/agokule/google-classroom-calendar-sync#readme
+
+[Timer]
+OnCalendar=daily
+# Don't hit Google at exactly midnight every time.
+RandomizedDelaySec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

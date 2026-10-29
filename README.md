@@ -102,6 +102,81 @@ to from anywhere — useful for a calendar app that can't read a local file
 directly. "Secret" means unlisted, not access-controlled: treat the URL
 itself as the secret.
 
+## Optional: sync automatically (Linux, systemd)
+
+`systemd/` has a user service that runs `classroom-sync run` and a timer
+that starts it once a day. If the computer was off or asleep when a run
+was due, the timer runs it as soon as the computer is back. Get
+`classroom-sync run` working by hand first, then install them:
+
+```bash
+mkdir -p ~/.config/systemd/user
+cp "$(npm root -g)/classroom-session-sync/systemd/"* ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now classroom-sync.timer
+```
+
+systemd doesn't load your shell profile, so the service only finds
+`classroom-sync` and `node` in `/usr/bin` or `/usr/local/bin`. If
+`command -v classroom-sync` prints anything else (nvm, `~/.local/bin`,
+`~/.npm-global/bin`, ...), give the service your current PATH. Run this
+again if you switch Node versions:
+
+```bash
+mkdir -p ~/.config/systemd/user/classroom-sync.service.d
+cat > ~/.config/systemd/user/classroom-sync.service.d/path.conf <<EOF
+[Service]
+Environment=PATH=$(dirname "$(command -v classroom-sync)"):$(dirname "$(command -v node)"):/usr/local/bin:/usr/bin
+EOF
+systemctl --user daemon-reload
+```
+
+To publish to your Gist after every sync, add a second command. It only
+runs if the sync succeeded:
+
+```bash
+mkdir -p ~/.config/systemd/user/classroom-sync.service.d
+cat > ~/.config/systemd/user/classroom-sync.service.d/gist.conf <<'EOF'
+[Service]
+ExecStart=/usr/bin/env classroom-sync sync-gist
+EOF
+systemctl --user daemon-reload
+```
+
+The service doesn't see environment variables from your shell, such as
+`GIST_TOKEN`. Save settings with `classroom-sync config` instead, or set
+them in a drop-in with `Environment=`.
+
+```bash
+systemctl --user start classroom-sync.service     # sync now
+systemctl --user list-timers classroom-sync.timer  # last and next run
+journalctl --user -u classroom-sync.service        # output of past runs
+systemctl --user disable --now classroom-sync.timer
+```
+
+When your Google session expires, runs fail and the journal says so.
+Syncing starts working again on the next run after you run
+`classroom-sync login`. User timers only run while you're logged in;
+`loginctl enable-linger` lets them run when you aren't.
+
+To change the schedule, run `systemctl --user edit classroom-sync.timer`
+and replace `OnCalendar` (the empty line clears the daily default):
+
+```ini
+[Timer]
+OnCalendar=
+OnCalendar=*-*-* 07:00:00
+```
+
+If you run from a clone, copy the units from its `systemd/` directory and
+point the service at the clone in a drop-in:
+
+```ini
+[Service]
+ExecStart=
+ExecStart=/usr/bin/env npm --prefix /path/to/clone run sync
+```
+
 ## License
 
 MIT

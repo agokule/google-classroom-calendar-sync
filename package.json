@@ -7,7 +7,8 @@
     "classroom-sync": "./dist/cli.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "systemd"
   ],
   "scripts": {
     "build": "tsc",

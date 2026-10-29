@@ -117,6 +117,13 @@ lifecycle script on `npm install -g`); when developing in a clone, use the
   `CLASSROOM_SYNC_BROWSER_CHANNEL` env var overrides the saved browser.
 - `src/types.ts` — shared `CalendarConfig` / `Settings` / `ParsedDate` /
   `ScrapedEvent` shapes used across the above.
+- `systemd/` — a user service (oneshot `classroom-sync run`) and a
+  daily timer for automatic syncing on Linux. Listed in `package.json`
+  `files`, so global installs can copy them from
+  `$(npm root -g)/classroom-session-sync/systemd/`. They find the binary
+  with `/usr/bin/env` and contain no absolute or per-user paths. PATH
+  fixes (nvm etc.), Gist publishing, and clone setups are drop-ins
+  documented in the README, so keep the shipped units generic.
 
 ## Key constraints when touching the scraper (`src/sync.ts`)
 
